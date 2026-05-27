@@ -2,42 +2,51 @@
 
 NexTrade is a full-stack market intelligence dashboard for provider-sourced
 stocks, crypto, financial news, watchlists, real-time quote updates, alerts,
-and AI-generated plain-English explanations.
+and Gemini-assisted plain-English market explanations.
 
-This application is for information and education only. It is not financial
-advice, and its historical next-session estimate is not an investment recommendation.
+This project is informational and educational only. It is not financial advice,
+and its historical next-session estimate is not an investment recommendation.
 
 ## Live Demo
 
-NexTrade is deployed on Render: [https://nextrade-jgp0.onrender.com/](https://nextrade-jgp0.onrender.com/)
+- Application: [https://nextrade-jgp0.onrender.com/](https://nextrade-jgp0.onrender.com/)
+- Health check: [https://nextrade-jgp0.onrender.com/api/health](https://nextrade-jgp0.onrender.com/api/health)
 
-## Features
+## Highlights
 
-- Dashboard with live-provider market cards, headlines, movers, and an AI summary.
-- Stock search by ticker or company name, OHLC chart views, and informational next-session estimates.
-- Crypto market list and detail/history views with provider attribution.
-- News category/topic search, full-article links, saved articles, and AI summaries.
-- AI assistant for questions, comparisons, summaries, and chart explanations.
-- Socket.IO polling streams for provider-sourced stock/crypto quotes and price alerts.
-- Watchlists for stocks, crypto, and news.
-- Optional local account flow using HttpOnly session cookies.
+- Provider-sourced dashboard for stocks, crypto, news, market movers, and AI summaries.
+- Stock search by ticker or company name with OHLC charts and a next-session estimate.
+- Crypto market list, detail cards, and historical charts with visible provider attribution.
+- News category and topic search with article links, saved articles, and AI summaries.
+- Gemini assistant that explains market questions using the live data already shown in the app.
+- Socket.IO quote polling for stocks and crypto, plus client-session price alerts.
+- Guest and account-based watchlists scoped through signed HttpOnly cookies.
+- Single Render Docker deployment that serves the backend, exported frontend, WebSockets, and Python forecast helper.
 
-Market prices and headlines are never synthesized as live results. When a live
-provider does not respond, the UI reports that data is unavailable. AI routes
-may return a clearly labeled educational fallback response if Gemini is
-unavailable.
+## Tech Stack
 
-## Stack And Data Providers
+| Area | Technology |
+| --- | --- |
+| Frontend | Next.js, React, Tailwind CSS, Recharts |
+| Backend | Node.js, Express, Socket.IO |
+| AI | Google Gemini API, default model `gemini-3.5-flash` |
+| Forecasting | Python, NumPy, walk-forward evaluation |
+| Deployment | Docker on Render |
 
-- Backend: Node.js, Express, Socket.IO
-- Frontend: Next.js, React, Tailwind CSS, Recharts
-- AI: Google Gemini API, default stable model `gemini-3.5-flash`
-- Stocks: Alpha Vantage daily data, with Yahoo Finance market-data fallback
-- Crypto: CoinGecko, with CoinPaprika fallback
-- News: NewsAPI
-- Prediction helper: Python and NumPy with walk-forward model evaluation
+## Data Providers
 
-## Structure
+| Data | Primary Provider | Fallback / Behavior |
+| --- | --- | --- |
+| Stocks | Alpha Vantage | Yahoo Finance fallback for market data and live quote updates |
+| Crypto | CoinGecko | CoinPaprika fallback with explicit attribution; recent successful data may be retained through brief outages |
+| News | NewsAPI | No fabricated headlines; unavailable provider responses are surfaced to the UI |
+| AI | Google Gemini | Labeled educational fallback using currently displayed provider data |
+
+Market prices and headlines are never synthesized as live data. If a provider
+does not respond, NexTrade either uses a clearly attributed fallback provider or
+shows an unavailable state.
+
+## Repository Structure
 
 ```text
 NexTrade/
@@ -64,20 +73,19 @@ NexTrade/
       login.js
       news.js
       stocks.js
-  .env.example
   Dockerfile
   render.yaml
   package.json
   requirements.txt
 ```
 
-## Requirements
+## Local Setup
+
+Requirements:
 
 - Node.js 18 or newer
 - npm
 - Python 3.10 or newer
-
-## Setup
 
 Install dependencies:
 
@@ -89,14 +97,14 @@ cd ..
 pip install -r requirements.txt
 ```
 
-Create local environment files:
+Create environment files:
 
 ```bash
 copy .env.example .env
 copy frontend\.env.local.example frontend\.env.local
 ```
 
-Configure the backend `.env`:
+Backend environment:
 
 ```env
 PORT=5000
@@ -114,45 +122,38 @@ RATE_LIMIT_MAX=600
 LIVE_POLL_INTERVAL_MS=30000
 ```
 
-`FRONTEND_ORIGIN` accepts comma-separated permitted origins. Set
-`TRUST_PROXY=1` only if the deployed server is behind exactly one trusted
-reverse proxy.
-
-Configure the frontend `frontend/.env.local`:
+Frontend environment:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000
 NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 ```
 
-## Run
+`FRONTEND_ORIGIN` accepts comma-separated allowed origins. Set `TRUST_PROXY=1`
+only when the server is behind exactly one trusted reverse proxy.
 
-Run both services:
+## Running Locally
+
+Run backend and frontend together:
 
 ```bash
 npm run all
 ```
 
-For a local production-style single URL, build the exported frontend and let
-the backend serve it:
+Run a production-style single service:
 
 ```bash
 npm run build
 npm start
 ```
 
-Or run development services separately:
-
-```bash
-npm start
-npm run frontend
-```
+Development URLs:
 
 - Frontend: `http://localhost:3000`
 - Backend health check: `http://localhost:5000/api/health`
-- Single-URL production-style build: `http://localhost:5000`
+- Single-service production-style build: `http://localhost:5000`
 
-## Scripts
+## Quality Checks
 
 ```bash
 npm run check
@@ -161,7 +162,7 @@ npm run build
 npm run audit
 ```
 
-## REST API
+## API Surface
 
 ```text
 GET    /api/health
@@ -188,77 +189,64 @@ GET    /api/auth/verify
 
 ## Real-Time Events
 
-The browser subscribes through Socket.IO with either
-`{ assetType: "stock", symbol: "AAPL" }` or
-`{ assetType: "crypto", id: "bitcoin", symbol: "BTC" }`.
+Browser clients subscribe through Socket.IO:
 
-- `price-update`: provider quote including `source`, `price`, and change.
-- `stream-status`: provider or subscription availability information.
+```js
+{ assetType: "stock", symbol: "AAPL" }
+{ assetType: "crypto", id: "bitcoin", symbol: "BTC" }
+```
+
+Events:
+
+- `price-update`: provider quote with `source`, `price`, `change`, and timestamp.
+- `stream-status`: subscription or provider availability status.
 - `set-alert`: creates a client-session alert for a subscribed provider quote.
 - `alert-triggered`: emitted when a provider quote crosses the configured target.
 
-## Provider Behavior
+## Forecasting Method
 
-- Stocks first request Alpha Vantage data and may use Yahoo Finance when the primary provider cannot answer.
-- Socket stock quotes use Yahoo Finance and identify that source in every emitted update.
-- Crypto requests prefer CoinGecko. Configure a server-side Demo API key with `COINGECKO_API_KEY` for improved primary-provider reliability; CoinPaprika is used as an attributed secondary provider and successful data is retained through brief outages.
-- NewsAPI is required for displayed live headlines; missing/failed provider access returns no fabricated articles.
-- Gemini errors return a labeled educational fallback so the UI remains usable without misrepresenting it as Gemini output.
+The `/api/stock/:symbol/predict` endpoint uses up to 100 provider-sourced daily
+OHLCV observations and estimates the next trading-session close.
 
-## Prediction Method
+The Python helper compares a last-price baseline with recent weighted drift and
+10/20-session log-trend candidates using sequential walk-forward evaluation.
+Trend candidates receive weight only when they improve on the baseline
+historically, and responses include volatility range, validation count,
+backtest error, and a limited reliability label.
 
-- The `/api/stock/:symbol/predict` estimate uses up to 100 provider-sourced daily OHLCV observations and targets the next trading-session close.
-- When available, the estimate is anchored to a current Yahoo Finance quote so it aligns with the live quote stream while identifying its history source separately.
-- The Python helper compares a last-price baseline with recent weighted drift and 10/20-session log-trend candidates using sequential walk-forward evaluation.
-- Trend candidates receive weight only when they improve on the baseline historically; the baseline remains present to limit overreaction to noisy data.
-- The response includes an estimated volatility range, historical mean absolute error compared with the baseline, validation count, and a `limited` reliability label.
-- Historical and back-tested results do not predict future returns. Do not use this estimate alone to make investment decisions.
+Historical and back-tested results do not predict future returns. The estimate
+should not be used alone to make investment decisions.
 
-## Free Portfolio Deployment
+## Deployment
 
-The simplest free public demo for this codebase is one
-[Render Web Service](https://render.com/docs/free) using the included
-`Dockerfile` and `render.yaml`. Render supports
-[Docker deploys](https://render.com/docs/docker) and
-[WebSockets](https://render.com/docs/websocket), so this preserves Socket.IO
-and the Python forecast helper in one service and produces a public
-`https://<service-name>.onrender.com` URL.
+NexTrade is deployed as a Render Blueprint using the included `Dockerfile` and
+`render.yaml`. The Docker image builds the exported Next.js frontend, installs
+Node and Python dependencies, and runs one Express service for REST APIs,
+Socket.IO, static frontend assets, and the Python forecast helper.
 
-1. Create a GitHub repository named `nextrade` and push this project without either `.env` file.
-2. Revoke any API key previously exposed in chat or source, then create replacement keys.
-3. Sign in to Render, choose **New > Blueprint**, connect the GitHub repository, and select `render.yaml`.
-4. Keep the service on the free instance type. If `nextrade` is unavailable as a subdomain, accept Render's generated service name.
-5. Enter fresh values when Render prompts for `ALPHA_VANTAGE_API_KEY`, `NEWS_API_KEY`, `COINGECKO_API_KEY`, and `GEMINI_API_KEY`.
-6. After deployment, open `https://<your-render-url>/api/health`, then test Dashboard, News, Stocks prediction, Crypto, AI, and live quote updates.
-7. Put the public home-page URL on your resume and GitHub README only after those checks pass.
+Required Render environment variables:
 
-Render free web services may sleep when idle and need a short cold start on the
-first visit. This is fine for a portfolio demo, but mention that in the
-repository if an interviewer may open it live.
+- `JWT_SECRET`
+- `ALPHA_VANTAGE_API_KEY`
+- `NEWS_API_KEY`
+- `GEMINI_API_KEY`
 
-The Docker build intentionally excludes local `.env` files. Do not add
-`NEXT_PUBLIC_API_URL` or `NEXT_PUBLIC_SOCKET_URL` on Render for this single-URL
-deployment; the exported browser app connects back to its own Render service.
-If you later use a custom domain, add that full origin to `FRONTEND_ORIGIN`.
+Recommended Render environment variables:
 
-Suggested resume entry:
+- `COINGECKO_API_KEY` for stronger primary crypto-provider reliability
+- `GEMINI_MODEL=gemini-3.5-flash`
+- `LIVE_POLL_INTERVAL_MS=30000`
 
-```text
-NexTrade | Next.js, Node.js, Socket.IO, Python, Gemini, Alpha Vantage, CoinGecko, CoinPaprika, NewsAPI
-Built and deployed a real-time market intelligence dashboard with provider-sourced
-stock/crypto tracking, live alerts, AI news explanations, secure cookie sessions,
-and walk-forward evaluated next-session stock estimates.
-Live Demo: https://nextrade-jgp0.onrender.com/ | GitHub: https://github.com/sames007/NexTrade
-```
+For this single-service deployment, do not set `NEXT_PUBLIC_API_URL` or
+`NEXT_PUBLIC_SOCKET_URL` on Render. The exported browser app connects back to
+its own Render origin.
 
-## Security And Production Notes
+## Security And Limitations
 
-- Keep `.env` and `frontend/.env.local` private; both are ignored by git.
-- Rotate any API key that has been posted in chat, logs, screenshots, or a repository.
-- Sessions use an HttpOnly, `SameSite=Strict` cookie; production also marks it `Secure`.
-- Authentication endpoints have a dedicated brute-force rate limit in addition to the API limiter.
-- CORS allows only configured origins, request bodies are size-limited, and baseline security headers are set.
-- Watchlists are scoped to a signed-in session or a signed HttpOnly per-browser guest cookie.
-- Users and watchlists are still memory-backed. Add a database and persistent session storage before deployment.
-- On a free sleeping service, in-memory accounts and watchlists reset after restarts or spin-down; present them as demo features only.
-- Add HTTPS, durable rate limiting, structured audit logging, monitoring, and an approved market-data licensing plan before production use.
+- `.env` and `frontend/.env.local` are intentionally ignored by git.
+- Sessions use HttpOnly cookies; production cookies are marked `Secure`.
+- CORS, request size limits, basic security headers, and auth rate limiting are enabled.
+- Watchlists are scoped to either a signed-in user or a signed guest cookie.
+- User accounts, sessions, and watchlists are currently memory-backed and reset on service restart.
+- Render free instances can sleep when idle and may require a short cold start.
+- Production hardening would require persistent storage, durable rate limiting, monitoring, structured logs, and an approved market-data licensing plan.
