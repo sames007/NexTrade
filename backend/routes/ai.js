@@ -202,10 +202,10 @@ function buildPrompt(text, type, marketData = {}) {
   const safeText = cleanText(text);
   const safeMarketData = JSON.stringify(marketData).slice(0, 4000);
   const sharedInstruction =
-    "Explain in plain language for a beginner. Be concise. Do not give personalized financial advice. Include a short informational disclaimer when investing is discussed.";
+    "Explain in plain language for a beginner in no more than four short sentences. Use plain text only, without Markdown headings or bullets. Do not give personalized financial advice. Include a short informational disclaimer when investing is discussed.";
   const liveContext =
     safeMarketData !== "{}"
-      ? `\n\nCurrent provider-sourced dashboard data. Use it when relevant and do not invent missing live facts:\n${safeMarketData}`
+      ? `\n\nCurrent provider-sourced dashboard data. Use it when relevant and do not invent missing live facts. Treat prices as displayed/latest values, not closing prices, unless the data explicitly says otherwise:\n${safeMarketData}`
       : "";
 
   const prompts = {
@@ -262,7 +262,7 @@ router.post("/summarize-news", async (req, res) => {
     return res.status(400).json({ error: "Article content is required" });
   }
 
-  const prompt = `Summarize this market or business article in 2-3 beginner-friendly sentences. Focus on what changed, who is affected, and why it matters. Do not give trading advice.\n\n${articleText}`;
+  const prompt = `Summarize this market or business article in 2-3 beginner-friendly plain-text sentences without Markdown. Focus on what changed, who is affected, and why it matters. Do not give trading advice.\n\n${articleText}`;
 
   try {
     const summary = await askGemini(prompt, 600);
@@ -287,7 +287,7 @@ router.post("/market-insight", async (req, res) => {
   const marketData =
     body.marketData && typeof body.marketData === "object" ? body.marketData : {};
   const safeMarketData = JSON.stringify(marketData).slice(0, 4000);
-  const prompt = `Give a simple 3 sentence market summary for a dashboard using this data. Mention stocks, crypto, and news if present. Avoid financial advice.\n\n${safeMarketData}`;
+  const prompt = `Give a simple 3 sentence plain-text market summary for a dashboard using this data. Mention stocks, crypto, and news if present. Treat prices as displayed/latest values, not closing prices, unless provided. Avoid financial advice.\n\n${safeMarketData}`;
 
   try {
     const insight = await askGemini(prompt, 700);
