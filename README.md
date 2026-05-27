@@ -11,7 +11,7 @@ advice, and its historical next-session estimate is not an investment recommenda
 
 - Dashboard with live-provider market cards, headlines, movers, and an AI summary.
 - Stock search by ticker or company name, OHLC chart views, and informational next-session estimates.
-- Crypto market list and detail/history views using CoinGecko attribution.
+- Crypto market list and detail/history views with provider attribution.
 - News category/topic search, full-article links, saved articles, and AI summaries.
 - AI assistant for questions, comparisons, summaries, and chart explanations.
 - Socket.IO polling streams for provider-sourced stock/crypto quotes and price alerts.
@@ -29,7 +29,7 @@ unavailable.
 - Frontend: Next.js, React, Tailwind CSS, Recharts
 - AI: Google Gemini API, default stable model `gemini-3.5-flash`
 - Stocks: Alpha Vantage daily data, with Yahoo Finance market-data fallback
-- Crypto: CoinGecko
+- Crypto: CoinGecko, with CoinPaprika fallback
 - News: NewsAPI
 - Prediction helper: Python and NumPy with walk-forward model evaluation
 
@@ -197,7 +197,7 @@ The browser subscribes through Socket.IO with either
 
 - Stocks first request Alpha Vantage data and may use Yahoo Finance when the primary provider cannot answer.
 - Socket stock quotes use Yahoo Finance and identify that source in every emitted update.
-- CoinGecko is required for displayed crypto prices and charts. Configure a server-side Demo API key with `COINGECKO_API_KEY` for deployed reliability; after successful retrieval, brief outages retain the most recent provider data with a stale-data notice.
+- Crypto requests prefer CoinGecko. Configure a server-side Demo API key with `COINGECKO_API_KEY` for improved primary-provider reliability; CoinPaprika is used as an attributed secondary provider and successful data is retained through brief outages.
 - NewsAPI is required for displayed live headlines; missing/failed provider access returns no fabricated articles.
 - Gemini errors return a labeled educational fallback so the UI remains usable without misrepresenting it as Gemini output.
 
@@ -240,7 +240,7 @@ If you later use a custom domain, add that full origin to `FRONTEND_ORIGIN`.
 Suggested resume entry:
 
 ```text
-NexTrade | Next.js, Node.js, Socket.IO, Python, Gemini, Alpha Vantage, CoinGecko, NewsAPI
+NexTrade | Next.js, Node.js, Socket.IO, Python, Gemini, Alpha Vantage, CoinGecko, CoinPaprika, NewsAPI
 Built and deployed a real-time market intelligence dashboard with provider-sourced
 stock/crypto tracking, live alerts, AI news explanations, secure cookie sessions,
 and walk-forward evaluated next-session stock estimates.

@@ -193,6 +193,7 @@ export default function MarketAssistantApp({ initialTab = 'dashboard' }) {
   const [cryptoDetail, setCryptoDetail] = useState(null);
   const [cryptoHistory, setCryptoHistory] = useState([]);
   const [cryptoStatus, setCryptoStatus] = useState('Loading crypto markets...');
+  const [cryptoSource, setCryptoSource] = useState('CoinGecko');
 
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiAnswer, setAiAnswer] = useState('');
@@ -448,6 +449,9 @@ export default function MarketAssistantApp({ initialTab = 'dashboard' }) {
 
       setCryptoList(coins);
       setCryptoStatus(response.data.message || response.data.attribution || 'Crypto prices updated.');
+      setCryptoSource(
+        String(response.data.attribution || 'CoinGecko').replace(/^Data provided by /, '')
+      );
 
       if (coins[0] && !cryptoDetail) {
         await loadCryptoDetail(coins[0].id);
@@ -994,7 +998,7 @@ export default function MarketAssistantApp({ initialTab = 'dashboard' }) {
                   <p className={`mt-1 text-sm font-bold ${trendClass(cryptoList[0]?.priceChangePercent24h)}`}>
                     {formatPercent(cryptoList[0]?.priceChangePercent24h)}
                   </p>
-                  <p className="mt-1 text-[11px] text-stone-500">CoinGecko</p>
+                  <p className="mt-1 text-[11px] text-stone-500">{cryptoSource}</p>
                 </div>
                 <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
                   <p className="text-xs uppercase tracking-[0.22em] text-stone-500">Headlines</p>
@@ -1425,7 +1429,7 @@ export default function MarketAssistantApp({ initialTab = 'dashboard' }) {
               <div className="mt-5 grid gap-3">
                 {!cryptoList.length && (
                   <p className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-stone-400">
-                    No live crypto quotes are available. Try again when CoinGecko responds.
+                    No live crypto quotes are available. Try again when a provider responds.
                   </p>
                 )}
                 {cryptoList.map((coin) => (
@@ -1460,7 +1464,7 @@ export default function MarketAssistantApp({ initialTab = 'dashboard' }) {
                   </button>
                 ))}
               </div>
-              <p className="mt-4 text-xs text-stone-500">Data provided by CoinGecko.</p>
+              <p className="mt-4 text-xs text-stone-500">Data provided by {cryptoSource}.</p>
             </div>
 
             <div className={panelClass()}>
@@ -1647,7 +1651,7 @@ export default function MarketAssistantApp({ initialTab = 'dashboard' }) {
         )}
 
         <footer className="pb-8 pt-2 text-center text-xs leading-6 text-stone-500">
-          Data sources: Alpha Vantage, NewsAPI, CoinGecko, and Google Gemini when keys are configured. This app is informational only and does not provide financial advice.
+          Data sources: Alpha Vantage, NewsAPI, CoinGecko, CoinPaprika, and Google Gemini when keys are configured. This app is informational only and does not provide financial advice.
         </footer>
       </div>
     </main>

@@ -35,6 +35,14 @@ const cryptoSymbols = new Map([
   ["ADA", "cardano"],
   ["DOGE", "dogecoin"]
 ]);
+const coinPaprikaIds = new Map([
+  ["bitcoin", "btc-bitcoin"],
+  ["ethereum", "eth-ethereum"],
+  ["solana", "sol-solana"],
+  ["ripple", "xrp-xrp"],
+  ["cardano", "ada-cardano"],
+  ["dogecoin", "doge-dogecoin"]
+]);
 
 function normalizeStockSymbol(value) {
   const symbol = String(value || "")
@@ -108,28 +116,50 @@ async function getStockQuote(subscription) {
 }
 
 async function getCryptoQuote(subscription) {
-  const response = await axios.get("https://api.coingecko.com/api/v3/simple/price", {
-    ...coinGeckoRequestConfig(),
-    params: {
-      ids: subscription.id,
-      vs_currencies: "usd",
-      include_24hr_change: true
+  try {
+    const response = await axios.get("https://api.coingecko.com/api/v3/simple/price", {
+      ...coinGeckoRequestConfig(),
+      params: {
+        ids: subscription.id,
+        vs_currencies: "usd",
+        include_24hr_change: true
+      }
+    });
+    const coin = response.data?.[subscription.id] || {};
+    const price = Number(coin.usd);
+
+    if (!Number.isFinite(price)) {
+      throw new Error("Crypto quote has no price");
     }
-  });
-  const coin = response.data?.[subscription.id] || {};
-  const price = Number(coin.usd);
 
-  if (!Number.isFinite(price)) {
-    throw new Error("Crypto quote has no price");
+    return {
+      ...subscription,
+      price,
+      change: Number(Number(coin.usd_24h_change || 0).toFixed(2)),
+      source: "CoinGecko",
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    const paprikaId = coinPaprikaIds.get(subscription.id) || subscription.id;
+    const response = await axios.get(
+      `https://api.coinpaprika.com/v1/tickers/${encodeURIComponent(paprikaId)}`,
+      requestConfig
+    );
+    const quote = response.data?.quotes?.USD || {};
+    const price = Number(quote.price);
+
+    if (!Number.isFinite(price)) {
+      throw new Error("Crypto quote has no price");
+    }
+
+    return {
+      ...subscription,
+      price,
+      change: Number(Number(quote.percent_change_24h || 0).toFixed(2)),
+      source: "CoinPaprika",
+      timestamp: new Date().toISOString()
+    };
   }
-
-  return {
-    ...subscription,
-    price,
-    change: Number(Number(coin.usd_24h_change || 0).toFixed(2)),
-    source: "CoinGecko",
-    timestamp: new Date().toISOString()
-  };
 }
 
 async function publishLatestPrice(io, subscription) {

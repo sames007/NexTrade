@@ -6,6 +6,18 @@ const cryptoCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let lastRequestTime = 0;
 const THROTTLE_DELAY_MS = 1200;
+const coinPaprikaIds = new Map([
+  ["bitcoin", "btc-bitcoin"],
+  ["ethereum", "eth-ethereum"],
+  ["tether", "usdt-tether"],
+  ["binancecoin", "bnb-binance-coin"],
+  ["solana", "sol-solana"],
+  ["ripple", "xrp-xrp"],
+  ["usd-coin", "usdc-usd-coin"],
+  ["dogecoin", "doge-dogecoin"],
+  ["cardano", "ada-cardano"],
+  ["tron", "trx-tron"]
+]);
 
 function cacheGet(key) {
   const cached = cryptoCache.get(key);
@@ -50,6 +62,22 @@ async function coingeckoGet(path, params = {}) {
   });
 }
 
+function coinPaprikaId(value) {
+  return coinPaprikaIds.get(value) || value;
+}
+
+async function coinPaprikaGet(path, params = {}) {
+  return axios.get(`https://api.coinpaprika.com/v1${path}`, {
+    proxy: false,
+    timeout: 15000,
+    params,
+    headers: {
+      accept: "application/json",
+      "user-agent": "NexTrade/1.0"
+    }
+  });
+}
+
 function toMarketCoin(coin) {
   return {
     id: coin.id,
@@ -62,6 +90,23 @@ function toMarketCoin(coin) {
     priceChange24h: Number(coin.price_change_24h || 0),
     priceChangePercent24h: Number(coin.price_change_percentage_24h || coin.priceChangePercent24h || 0),
     volume24h: Number(coin.total_volume || coin.volume24h || 0)
+  };
+}
+
+function toCoinPaprikaMarketCoin(coin) {
+  const quote = coin.quotes?.USD || {};
+
+  return {
+    id: coin.id,
+    symbol: String(coin.symbol || "").toUpperCase(),
+    name: coin.name || "Unknown",
+    image: "",
+    currentPrice: Number(quote.price || 0),
+    marketCap: quote.market_cap || null,
+    marketCapRank: coin.rank || null,
+    priceChange24h: null,
+    priceChangePercent24h: Number(quote.percent_change_24h || 0),
+    volume24h: Number(quote.volume_24h || 0)
   };
 }
 
@@ -107,8 +152,27 @@ router.get("/top", async (req, res) => {
     cacheSet(cacheKey, result);
     return res.json(result);
   } catch (err) {
-    const fallback = cachedFallback(cacheKey);
-    if (fallback) return res.json(fallback);
+    try {
+      const response = await coinPaprikaGet("/tickers", {
+        quotes: "USD",
+        limit
+      });
+      const data = response.data.slice(0, limit).map(toCoinPaprikaMarketCoin);
+      const result = {
+        status: "success",
+        isRealData: true,
+        data,
+        count: data.length,
+        timestamp: new Date().toISOString(),
+        attribution: "Data provided by CoinPaprika"
+      };
+
+      cacheSet(cacheKey, result);
+      return res.json(result);
+    } catch (alternateError) {
+      const fallback = cachedFallback(cacheKey);
+      if (fallback) return res.json(fallback);
+    }
 
     return res.json({
       status: "unavailable",
@@ -206,8 +270,39 @@ router.get("/:id/history", async (req, res) => {
     cacheSet(cacheKey, result);
     return res.json(result);
   } catch (err) {
-    const fallback = cachedFallback(cacheKey);
-    if (fallback) return res.json(fallback);
+    try {
+      const paprikaId = coinPaprikaId(cryptoId);
+      const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+      const response = await coinPaprikaGet(`/tickers/${encodeURIComponent(paprikaId)}/historical`, {
+        start,
+        interval: "1d",
+        quote: "usd"
+      });
+      const prices = response.data.map((point) => ({
+        time: point.timestamp,
+        price: Number(Number(point.price).toFixed(6))
+      }));
+      const volumes = response.data.map((point) => ({
+        time: point.timestamp,
+        volume: Number(Number(point.volume_24h || 0).toFixed(2))
+      }));
+      const result = {
+        status: "success",
+        isRealData: true,
+        id: cryptoId,
+        prices,
+        volumes,
+        attribution: "Data provided by CoinPaprika"
+      };
+
+      cacheSet(cacheKey, result);
+      return res.json(result);
+    } catch (alternateError) {
+      const fallback = cachedFallback(cacheKey);
+      if (fallback) return res.json(fallback);
+    }
 
     return res.json({
       status: "unavailable",
@@ -260,8 +355,35 @@ router.get("/:id", async (req, res) => {
     cacheSet(cacheKey, result);
     return res.json(result);
   } catch (err) {
-    const fallback = cachedFallback(cacheKey);
-    if (fallback) return res.json(fallback);
+    try {
+      const response = await coinPaprikaGet(`/tickers/${encodeURIComponent(coinPaprikaId(cryptoId))}`, {
+        quotes: "USD"
+      });
+      const ticker = response.data;
+      const quote = ticker.quotes?.USD || {};
+      const result = {
+        status: "success",
+        isRealData: true,
+        id: cryptoId,
+        symbol: String(ticker.symbol || "").toUpperCase(),
+        name: ticker.name || "Unknown",
+        image: "",
+        description: "",
+        currentPrice: Number(quote.price || 0),
+        marketCap: quote.market_cap || null,
+        marketCapRank: ticker.rank || null,
+        priceChangePercent24h: Number(quote.percent_change_24h || 0),
+        volume24h: Number(quote.volume_24h || 0),
+        circulatingSupply: ticker.circulating_supply || null,
+        attribution: "Data provided by CoinPaprika"
+      };
+
+      cacheSet(cacheKey, result);
+      return res.json(result);
+    } catch (alternateError) {
+      const fallback = cachedFallback(cacheKey);
+      if (fallback) return res.json(fallback);
+    }
 
     return res.status(503).json({
       status: "unavailable",
