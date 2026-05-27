@@ -14,9 +14,11 @@ services:
         sync: false
       - key: NEWS_API_KEY
         sync: false
+      - key: COINGECKO_API_KEY
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-flash-latest
+        value: gemini-3.5-flash
       - key: LIVE_POLL_INTERVAL_MS
         value: "30000"

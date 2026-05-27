@@ -15,6 +15,18 @@ const requestConfig = {
   }
 };
 
+function coinGeckoRequestConfig() {
+  const apiKey = String(process.env.COINGECKO_API_KEY || "").trim();
+
+  return {
+    ...requestConfig,
+    headers: {
+      ...requestConfig.headers,
+      ...(apiKey ? { "x-cg-demo-api-key": apiKey } : {})
+    }
+  };
+}
+
 const cryptoSymbols = new Map([
   ["BTC", "bitcoin"],
   ["ETH", "ethereum"],
@@ -74,7 +86,7 @@ async function getStockQuote(subscription) {
   );
   const meta = response.data?.chart?.result?.[0]?.meta || {};
   const price = Number(meta.regularMarketPrice);
-  const previousClose = Number(meta.chartPreviousClose || meta.previousClose);
+  const previousClose = Number(meta.previousClose || meta.chartPreviousClose);
 
   if (!Number.isFinite(price)) {
     throw new Error("Stock quote has no price");
@@ -97,7 +109,7 @@ async function getStockQuote(subscription) {
 
 async function getCryptoQuote(subscription) {
   const response = await axios.get("https://api.coingecko.com/api/v3/simple/price", {
-    ...requestConfig,
+    ...coinGeckoRequestConfig(),
     params: {
       ids: subscription.id,
       vs_currencies: "usd",

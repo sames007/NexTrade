@@ -508,6 +508,29 @@ export default function MarketAssistantApp({ initialTab = 'dashboard' }) {
     }
   }
 
+  function currentMarketData() {
+    const latestStockPoint = stock?.data?.[stock.data.length - 1];
+
+    return {
+      stock: stock
+        ? {
+            symbol: stock.symbol,
+            latestPrice: stock.latestPrice,
+            dailyChangePercent: stock.dailyChangePercent,
+            volume: latestStockPoint?.volume,
+            source: stock.source,
+          }
+        : null,
+      crypto: cryptoList.slice(0, 4).map((coin) => ({
+        symbol: coin.symbol,
+        price: coin.currentPrice,
+        change: coin.priceChangePercent24h,
+        volume24h: coin.volume24h,
+      })),
+      headlines: headlines.slice(0, 4).map((article) => article.title),
+    };
+  }
+
   async function askAI(question = aiQuestion, type = 'general') {
     const text = String(question || '').trim();
 
@@ -520,7 +543,11 @@ export default function MarketAssistantApp({ initialTab = 'dashboard' }) {
     setAiStatus('Thinking with Gemini or the safe local fallback...');
 
     try {
-      const response = await api.post('/api/ai/explain', { text, type });
+      const response = await api.post('/api/ai/explain', {
+        text,
+        type,
+        marketData: currentMarketData(),
+      });
       setAiAnswer(response.data.explanation);
       setAiStatus(
         response.data.status === 'gemini'
@@ -534,21 +561,7 @@ export default function MarketAssistantApp({ initialTab = 'dashboard' }) {
   }
 
   async function loadMarketInsight() {
-    const marketData = {
-      stock: stock
-        ? {
-            symbol: stock.symbol,
-            latestPrice: stock.latestPrice,
-            dailyChangePercent: stock.dailyChangePercent,
-          }
-        : null,
-      crypto: cryptoList.slice(0, 4).map((coin) => ({
-        symbol: coin.symbol,
-        price: coin.currentPrice,
-        change: coin.priceChangePercent24h,
-      })),
-      headlines: headlines.slice(0, 4).map((article) => article.title),
-    };
+    const marketData = currentMarketData();
 
     try {
       const response = await api.post('/api/ai/market-insight', { marketData });

@@ -19,6 +19,17 @@ function cacheSet(key, data) {
   cryptoCache.set(key, { data, timestamp: Date.now() });
 }
 
+function cachedFallback(key) {
+  const cached = cryptoCache.get(key)?.data;
+  if (!cached) return null;
+
+  return {
+    ...cached,
+    status: "stale",
+    message: "CoinGecko is temporarily unavailable; showing the last retrieved data."
+  };
+}
+
 async function coingeckoGet(path, params = {}) {
   const wait = THROTTLE_DELAY_MS - (Date.now() - lastRequestTime);
   if (wait > 0) {
@@ -26,13 +37,15 @@ async function coingeckoGet(path, params = {}) {
   }
 
   lastRequestTime = Date.now();
+  const apiKey = String(process.env.COINGECKO_API_KEY || "").trim();
   return axios.get(`https://api.coingecko.com/api/v3${path}`, {
     proxy: false,
     timeout: 15000,
     params,
     headers: {
       accept: "application/json",
-      "user-agent": "NexTrade/1.0"
+      "user-agent": "NexTrade/1.0",
+      ...(apiKey ? { "x-cg-demo-api-key": apiKey } : {})
     }
   });
 }
@@ -94,6 +107,9 @@ router.get("/top", async (req, res) => {
     cacheSet(cacheKey, result);
     return res.json(result);
   } catch (err) {
+    const fallback = cachedFallback(cacheKey);
+    if (fallback) return res.json(fallback);
+
     return res.json({
       status: "unavailable",
       isRealData: false,
@@ -135,6 +151,9 @@ router.get("/search/:query", async (req, res) => {
     cacheSet(cacheKey, result);
     return res.json(result);
   } catch (err) {
+    const fallback = cachedFallback(cacheKey);
+    if (fallback) return res.json(fallback);
+
     return res.json({
       status: "unavailable",
       isRealData: false,
@@ -187,6 +206,9 @@ router.get("/:id/history", async (req, res) => {
     cacheSet(cacheKey, result);
     return res.json(result);
   } catch (err) {
+    const fallback = cachedFallback(cacheKey);
+    if (fallback) return res.json(fallback);
+
     return res.json({
       status: "unavailable",
       isRealData: false,
@@ -238,6 +260,9 @@ router.get("/:id", async (req, res) => {
     cacheSet(cacheKey, result);
     return res.json(result);
   } catch (err) {
+    const fallback = cachedFallback(cacheKey);
+    if (fallback) return res.json(fallback);
+
     return res.status(503).json({
       status: "unavailable",
       isRealData: false,

@@ -2,7 +2,7 @@ const express = require("express");
 const axios = require("axios");
 
 const router = express.Router();
-const DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
 const ALLOWED_EXPLANATION_TYPES = new Set([
   "stock-movement",
   "crypto-trend",
@@ -37,6 +37,18 @@ function hasGeminiKey() {
   return Boolean(getGeminiKey());
 }
 
+function getThinkingConfig() {
+  if (/^gemini-2\.5-/i.test(GEMINI_MODEL)) {
+    return { thinkingBudget: 0 };
+  }
+
+  if (/^gemini-(3|flash-latest)/i.test(GEMINI_MODEL)) {
+    return { thinkingLevel: "minimal" };
+  }
+
+  return null;
+}
+
 function cleanText(value, maxLength = 5000) {
   if (typeof value !== "string") return "";
   return value
@@ -51,10 +63,57 @@ function normalizeExplanationType(value) {
   return ALLOWED_EXPLANATION_TYPES.has(type) ? type : "general";
 }
 
-function fallbackAnswer(text, type = "general") {
+function formatContextPrice(value) {
+  const price = Number(value);
+  if (!Number.isFinite(price)) return "";
+  return `$${price.toLocaleString("en-US", { maximumFractionDigits: price < 1 ? 6 : 2 })}`;
+}
+
+function formatContextPercent(value) {
+  const percent = Number(value);
+  if (!Number.isFinite(percent)) return "";
+  return `${percent >= 0 ? "+" : ""}${percent.toFixed(2)}%`;
+}
+
+function contextualFallback(marketData = {}) {
+  const points = [];
+  const stock = marketData.stock;
+  const crypto = Array.isArray(marketData.crypto) ? marketData.crypto[0] : null;
+  const headlines = Array.isArray(marketData.headlines) ? marketData.headlines : [];
+
+  if (stock?.symbol && Number.isFinite(Number(stock.latestPrice))) {
+    const stockMove = formatContextPercent(stock.dailyChangePercent);
+    const volume = Number(stock.volume);
+    points.push(
+      `${cleanText(stock.symbol, 12)} is ${formatContextPrice(stock.latestPrice)}${stockMove ? ` (${stockMove} today)` : ""}${Number.isFinite(volume) ? ` on volume of ${volume.toLocaleString("en-US")}` : ""}.`
+    );
+  }
+
+  if (crypto?.symbol && Number.isFinite(Number(crypto.price))) {
+    const cryptoMove = formatContextPercent(crypto.change);
+    points.push(
+      `${cleanText(crypto.symbol, 12)} is ${formatContextPrice(crypto.price)}${cryptoMove ? ` (${cryptoMove} over 24 hours)` : ""}.`
+    );
+  }
+
+  if (headlines[0]) {
+    points.push(`A displayed headline is "${cleanText(headlines[0], 140)}".`);
+  }
+
+  if (!points.length) return "";
+
+  return `${points.join(" ")} This summary uses only currently displayed provider data because Gemini is unavailable.`;
+}
+
+function fallbackAnswer(text, type = "general", marketData = {}) {
   const topic = cleanText(text, 220) || "this market topic";
   const disclaimer =
     "This is informational only, not financial advice. Check current data and your own risk before investing.";
+  const liveContext = contextualFallback(marketData);
+
+  if (liveContext) {
+    return `${liveContext} ${disclaimer}`;
+  }
 
   if (type === "crypto-trend") {
     return `In simple terms, crypto prices often move because of risk appetite, liquidity, regulation news, and large trader activity. For "${topic}", compare price action with volume, Bitcoin trend, and recent headlines. ${disclaimer}`;
@@ -88,21 +147,18 @@ function geminiStatusMessage(err) {
   return "Gemini unavailable; returned local fallback";
 }
 
-async function askGemini(prompt, maxOutputTokens = 450) {
-  if (!hasGeminiKey()) {
-    const error = new Error("Gemini API key is not configured");
-    error.code = "NO_GEMINI_KEY";
-    throw error;
-  }
+async function generateGeminiContent(prompt, maxOutputTokens) {
+  const thinkingConfig = getThinkingConfig();
 
-  const response = await axios.post(
+  return axios.post(
     GEMINI_URL,
     {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.45,
         topP: 0.9,
-        maxOutputTokens
+        maxOutputTokens,
+        ...(thinkingConfig ? { thinkingConfig } : {})
       }
     },
     {
@@ -113,27 +169,52 @@ async function askGemini(prompt, maxOutputTokens = 450) {
       }
     }
   );
+}
 
-  const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
+function getGeminiText(response) {
+  return (response.data?.candidates?.[0]?.content?.parts || [])
+    .map((part) => part.text || "")
+    .join("")
+    .trim();
+}
+
+async function askGemini(prompt, maxOutputTokens = 700) {
+  if (!hasGeminiKey()) {
+    const error = new Error("Gemini API key is not configured");
+    error.code = "NO_GEMINI_KEY";
+    throw error;
+  }
+
+  let response = await generateGeminiContent(prompt, maxOutputTokens);
+  if (response.data?.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+    response = await generateGeminiContent(prompt, Math.max(maxOutputTokens * 2, 1600));
+  }
+
+  const text = getGeminiText(response);
+  if (!text || response.data?.candidates?.[0]?.finishReason === "MAX_TOKENS") {
     throw new Error("Gemini returned an empty response");
   }
 
-  return text.trim();
+  return text;
 }
 
-function buildPrompt(text, type) {
+function buildPrompt(text, type, marketData = {}) {
   const safeText = cleanText(text);
+  const safeMarketData = JSON.stringify(marketData).slice(0, 4000);
   const sharedInstruction =
     "Explain in plain language for a beginner. Be concise. Do not give personalized financial advice. Include a short informational disclaimer when investing is discussed.";
+  const liveContext =
+    safeMarketData !== "{}"
+      ? `\n\nCurrent provider-sourced dashboard data. Use it when relevant and do not invent missing live facts:\n${safeMarketData}`
+      : "";
 
   const prompts = {
-    "stock-movement": `You are a market explainer. ${sharedInstruction}\n\nQuestion or data: ${safeText}`,
-    "crypto-trend": `You are a crypto market explainer. ${sharedInstruction}\n\nQuestion or data: ${safeText}`,
-    "investment-question": `You are a financial education assistant. ${sharedInstruction}\n\nQuestion: ${safeText}`,
-    "market-news": `You are a financial news analyst. ${sharedInstruction}\n\nNews: ${safeText}`,
-    "chart-explanation": `You are explaining a market chart to a beginner. ${sharedInstruction}\n\nChart data or question: ${safeText}`,
-    general: `You are NexTrade, a smart live market and news assistant. ${sharedInstruction}\n\nUser question: ${safeText}`
+    "stock-movement": `You are a market explainer. ${sharedInstruction}\n\nQuestion or data: ${safeText}${liveContext}`,
+    "crypto-trend": `You are a crypto market explainer. ${sharedInstruction}\n\nQuestion or data: ${safeText}${liveContext}`,
+    "investment-question": `You are a financial education assistant. ${sharedInstruction}\n\nQuestion: ${safeText}${liveContext}`,
+    "market-news": `You are a financial news analyst. ${sharedInstruction}\n\nNews: ${safeText}${liveContext}`,
+    "chart-explanation": `You are explaining a market chart to a beginner. ${sharedInstruction}\n\nChart data or question: ${safeText}${liveContext}`,
+    general: `You are NexTrade, a smart live market and news assistant. ${sharedInstruction}\n\nUser question: ${safeText}${liveContext}`
   };
 
   return prompts[type] || prompts.general;
@@ -143,13 +224,15 @@ router.post("/explain", async (req, res) => {
   const body = req.body || {};
   const text = cleanText(body.text);
   const type = normalizeExplanationType(body.type);
+  const marketData =
+    body.marketData && typeof body.marketData === "object" ? body.marketData : {};
 
   if (!text) {
     return res.status(400).json({ error: "Text is required" });
   }
 
   try {
-    const explanation = await askGemini(buildPrompt(text, type), 500);
+    const explanation = await askGemini(buildPrompt(text, type, marketData), 900);
     return res.json({
       success: true,
       explanation,
@@ -160,7 +243,7 @@ router.post("/explain", async (req, res) => {
   } catch (err) {
     return res.json({
       success: true,
-      explanation: fallbackAnswer(text, type),
+      explanation: fallbackAnswer(text, type, marketData),
       type,
       status: "fallback",
       message: geminiStatusMessage(err)
@@ -182,7 +265,7 @@ router.post("/summarize-news", async (req, res) => {
   const prompt = `Summarize this market or business article in 2-3 beginner-friendly sentences. Focus on what changed, who is affected, and why it matters. Do not give trading advice.\n\n${articleText}`;
 
   try {
-    const summary = await askGemini(prompt, 220);
+    const summary = await askGemini(prompt, 600);
     return res.json({
       success: true,
       summary,
@@ -207,7 +290,7 @@ router.post("/market-insight", async (req, res) => {
   const prompt = `Give a simple 3 sentence market summary for a dashboard using this data. Mention stocks, crypto, and news if present. Avoid financial advice.\n\n${safeMarketData}`;
 
   try {
-    const insight = await askGemini(prompt, 260);
+    const insight = await askGemini(prompt, 700);
     return res.json({
       success: true,
       insight,
@@ -215,9 +298,12 @@ router.post("/market-insight", async (req, res) => {
       attribution: `Powered by Google Gemini (${GEMINI_MODEL})`
     });
   } catch (err) {
+    const fallbackInsight = contextualFallback(marketData);
     return res.json({
       success: true,
-      insight: "A live AI market summary is unavailable. Review the provider-labeled stock, crypto, and news data shown on the dashboard before drawing conclusions. This is informational only, not financial advice.",
+      insight: fallbackInsight
+        ? `${fallbackInsight} This is informational only, not financial advice.`
+        : "A live AI market summary is unavailable. Review the provider-labeled stock, crypto, and news data shown on the dashboard before drawing conclusions. This is informational only, not financial advice.",
       status: "fallback",
       message: geminiStatusMessage(err)
     });

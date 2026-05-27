@@ -27,7 +27,7 @@ unavailable.
 
 - Backend: Node.js, Express, Socket.IO
 - Frontend: Next.js, React, Tailwind CSS, Recharts
-- AI: Google Gemini API, default model alias `gemini-flash-latest`
+- AI: Google Gemini API, default stable model `gemini-3.5-flash`
 - Stocks: Alpha Vantage daily data, with Yahoo Finance market-data fallback
 - Crypto: CoinGecko
 - News: NewsAPI
@@ -101,8 +101,9 @@ FRONTEND_ORIGIN=http://localhost:3000
 JWT_SECRET=replace_with_at_least_24_characters
 ALPHA_VANTAGE_API_KEY=
 NEWS_API_KEY=
+COINGECKO_API_KEY=
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-flash-latest
+GEMINI_MODEL=gemini-3.5-flash
 PYTHON_BIN=python
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX=600
@@ -196,7 +197,7 @@ The browser subscribes through Socket.IO with either
 
 - Stocks first request Alpha Vantage data and may use Yahoo Finance when the primary provider cannot answer.
 - Socket stock quotes use Yahoo Finance and identify that source in every emitted update.
-- CoinGecko is required for displayed crypto prices and charts; outages are reported as unavailable.
+- CoinGecko is required for displayed crypto prices and charts. Configure a server-side Demo API key with `COINGECKO_API_KEY` for deployed reliability; after successful retrieval, brief outages retain the most recent provider data with a stale-data notice.
 - NewsAPI is required for displayed live headlines; missing/failed provider access returns no fabricated articles.
 - Gemini errors return a labeled educational fallback so the UI remains usable without misrepresenting it as Gemini output.
 
@@ -223,7 +224,7 @@ and the Python forecast helper in one service and produces a public
 2. Revoke any API key previously exposed in chat or source, then create replacement keys.
 3. Sign in to Render, choose **New > Blueprint**, connect the GitHub repository, and select `render.yaml`.
 4. Keep the service on the free instance type. If `nextrade` is unavailable as a subdomain, accept Render's generated service name.
-5. Enter fresh values when Render prompts for `ALPHA_VANTAGE_API_KEY`, `NEWS_API_KEY`, and `GEMINI_API_KEY`.
+5. Enter fresh values when Render prompts for `ALPHA_VANTAGE_API_KEY`, `NEWS_API_KEY`, `COINGECKO_API_KEY`, and `GEMINI_API_KEY`.
 6. After deployment, open `https://<your-render-url>/api/health`, then test Dashboard, News, Stocks prediction, Crypto, AI, and live quote updates.
 7. Put the public home-page URL on your resume and GitHub README only after those checks pass.
 

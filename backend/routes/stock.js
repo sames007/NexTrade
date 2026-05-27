@@ -285,7 +285,7 @@ async function fetchYahooStock(symbol) {
     metadata,
     quote: {
       price: meta.regularMarketPrice,
-      previousClose: meta.chartPreviousClose || meta.previousClose
+      previousClose: meta.previousClose
     },
     source: "Yahoo Finance"
   });
