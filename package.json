@@ -1,0 +1,29 @@
+{
+  "name": "nextrade",
+  "version": "1.0.0",
+  "description": "NexTrade: live market and news intelligence with stocks, crypto, AI explanations, watchlists, and real-time updates",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
+    "build": "npm run build --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "check": "node --check backend/server.js && node --check backend/sockets.js && node --check backend/routes/ai.js && node --check backend/routes/auth.js && node --check backend/routes/crypto.js && node --check backend/routes/news.js && node --check backend/routes/stock.js && node --check backend/routes/watchlist.js && python -m py_compile ai/predict.py ai/test_predict.py && python -m unittest ai.test_predict",
+    "audit": "npm audit --audit-level=moderate && npm audit --audit-level=moderate --prefix frontend",
+    "frontend": "cd frontend && npm run dev",
+    "all": "concurrently \"npm start\" \"npm run frontend\""
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1",
+    "axios": "^1.4.0",
+    "dotenv": "^16.0.3",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22",
+    "concurrently": "^8.0.1"
+  }
+}
