@@ -7,6 +7,10 @@ and AI-generated plain-English explanations.
 This application is for information and education only. It is not financial
 advice, and its historical next-session estimate is not an investment recommendation.
 
+## Live Demo
+
+NexTrade is deployed on Render: [https://nextrade-jgp0.onrender.com/](https://nextrade-jgp0.onrender.com/)
+
 ## Features
 
 - Dashboard with live-provider market cards, headlines, movers, and an AI summary.
@@ -244,7 +248,7 @@ NexTrade | Next.js, Node.js, Socket.IO, Python, Gemini, Alpha Vantage, CoinGecko
 Built and deployed a real-time market intelligence dashboard with provider-sourced
 stock/crypto tracking, live alerts, AI news explanations, secure cookie sessions,
 and walk-forward evaluated next-session stock estimates.
-Live Demo: https://<your-render-url> | GitHub: https://github.com/<you>/nextrade
+Live Demo: https://nextrade-jgp0.onrender.com/ | GitHub: https://github.com/sames007/NexTrade
 ```
 
 ## Security And Production Notes
