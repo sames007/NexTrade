@@ -136,8 +136,17 @@ function geminiStatusMessage(err) {
   }
 
   const providerMessage = err?.response?.data?.error?.message || "";
+  const providerStatus = err?.response?.status;
   if (/api key not valid/i.test(providerMessage)) {
     return "Gemini API key is invalid";
+  }
+
+  if (providerStatus === 429 || /quota|rate limit|resource_exhausted/i.test(providerMessage)) {
+    return "Gemini quota or rate limit reached";
+  }
+
+  if (providerStatus === 403) {
+    return "Gemini request is not permitted for the configured key";
   }
 
   if (/not found/i.test(providerMessage)) {
