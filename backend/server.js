@@ -51,9 +51,51 @@ function getAllowedOrigins() {
 
 const allowedOrigins = getAllowedOrigins();
 
+function websocketOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return url.origin;
+  } catch (error) {
+    return "";
+  }
+}
+
+function buildContentSecurityPolicy() {
+  const connectSources = new Set(["'self'", "ws:", "wss:"]);
+  allowedOrigins.forEach((origin) => {
+    connectSources.add(origin);
+    const socketOrigin = websocketOrigin(origin);
+    if (socketOrigin) connectSources.add(socketOrigin);
+  });
+
+  const directives = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    `connect-src ${Array.from(connectSources).join(" ")}`,
+    "script-src 'self'",
+    "script-src-attr 'none'",
+    "style-src 'self' 'unsafe-inline'"
+  ];
+
+  if (process.env.NODE_ENV === "production") {
+    directives.push("upgrade-insecure-requests");
+  }
+
+  return directives.join("; ");
+}
+
+const contentSecurityPolicy = buildContentSecurityPolicy();
+
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) {
+    const requestOrigin = normalizeOrigin(origin || "");
+    if (!origin || allowedOrigins.has(requestOrigin)) {
       return callback(null, true);
     }
 
@@ -110,10 +152,16 @@ if (process.env.TRUST_PROXY) {
 }
 app.disable("x-powered-by");
 app.use((req, res, next) => {
+  res.setHeader("Content-Security-Policy", contentSecurityPolicy);
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   next();
 });
 

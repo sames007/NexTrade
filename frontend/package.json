@@ -22,5 +22,8 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.5.18",
     "postcss": "^8.5.15"
+  },
+  "overrides": {
+    "postcss": "^8.5.15"
   }
 }

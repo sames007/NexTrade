@@ -6,7 +6,22 @@ const watchlists = new Map();
 const MAX_ITEMS_PER_BUCKET = 100;
 const GUEST_COOKIE_NAME = "market_guest";
 const GUEST_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
-const COOKIE_SECRET = process.env.JWT_SECRET || "development-only-change-this-secret";
+
+function getCookieSecret() {
+  const secret = process.env.JWT_SECRET;
+
+  if (secret && secret.length >= 24) {
+    return secret;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET must be set to at least 24 characters.");
+  }
+
+  return "development-only-change-this-secret";
+}
+
+const COOKIE_SECRET = getCookieSecret();
 
 function emptyWatchlist() {
   return {
@@ -61,7 +76,7 @@ function guestId(req, res) {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   res.append(
     "Set-Cookie",
-    `${GUEST_COOKIE_NAME}=${value}; Path=/; Max-Age=${GUEST_COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Strict${secure}`
+    `${GUEST_COOKIE_NAME}=${value}; Path=/; Max-Age=${GUEST_COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Strict; Priority=High${secure}`
   );
   return id;
 }

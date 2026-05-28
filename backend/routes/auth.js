@@ -9,6 +9,8 @@ const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 128;
 const SESSION_COOKIE = "market_session";
 const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+const JWT_ISSUER = "nextrade";
+const JWT_AUDIENCE = "nextrade-web";
 const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_MAX_ATTEMPTS = 12;
 const authAttempts = new Map();
@@ -56,6 +58,12 @@ function authRateLimit(req, res, next) {
     return res.status(429).json({ error: "Too many login attempts. Try again later." });
   }
 
+  if (authAttempts.size > 10000) {
+    for (const [bucketKey, value] of authAttempts) {
+      if (value.resetAt <= now) authAttempts.delete(bucketKey);
+    }
+  }
+
   return next();
 }
 
@@ -66,13 +74,18 @@ function issueToken(user) {
       name: user.name
     },
     getJwtSecret(),
-    { expiresIn: SESSION_MAX_AGE_SECONDS }
+    {
+      audience: JWT_AUDIENCE,
+      expiresIn: SESSION_MAX_AGE_SECONDS,
+      issuer: JWT_ISSUER,
+      subject: user.email
+    }
   );
 }
 
 function serializeSessionCookie(value, maxAge = SESSION_MAX_AGE_SECONDS) {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${SESSION_COOKIE}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict${secure}`;
+  return `${SESSION_COOKIE}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict; Priority=High${secure}`;
 }
 
 function setSessionCookie(res, user) {
@@ -113,7 +126,20 @@ function readSessionToken(req) {
 
 function decodeSession(req) {
   const token = readSessionToken(req);
-  return token ? jwt.verify(token, getJwtSecret()) : null;
+  if (!token) return null;
+
+  const user = jwt.verify(token, getJwtSecret(), {
+    audience: JWT_AUDIENCE,
+    issuer: JWT_ISSUER
+  });
+
+  const email = normalizeEmail(user.email);
+  if (!EMAIL_PATTERN.test(email)) return null;
+
+  return {
+    email,
+    name: cleanName(user.name)
+  };
 }
 
 router.post("/register", authRateLimit, async (req, res) => {
