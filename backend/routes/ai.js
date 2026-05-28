@@ -37,6 +37,7 @@ function hasGeminiKey() {
   return Boolean(getGeminiKey());
 }
 
+// Keep thinking-capable Gemini models concise enough for UI-sized answers.
 function getThinkingConfig() {
   if (/^gemini-2\.5-/i.test(GEMINI_MODEL)) {
     return { thinkingBudget: 0 };
@@ -75,6 +76,7 @@ function formatContextPercent(value) {
   return `${percent >= 0 ? "+" : ""}${percent.toFixed(2)}%`;
 }
 
+// When Gemini is unavailable, summarize only provider data already displayed in the UI.
 function contextualFallback(marketData = {}) {
   const points = [];
   const stock = marketData.stock;
@@ -195,6 +197,7 @@ async function askGemini(prompt, maxOutputTokens = 700) {
   }
 
   let response = await generateGeminiContent(prompt, maxOutputTokens);
+  // Retry once with a larger budget instead of showing a cut-off Gemini answer.
   if (response.data?.candidates?.[0]?.finishReason === "MAX_TOKENS") {
     response = await generateGeminiContent(prompt, Math.max(maxOutputTokens * 2, 1600));
   }

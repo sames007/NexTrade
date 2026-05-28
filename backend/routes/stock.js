@@ -341,6 +341,7 @@ async function fetchStock(symbol) {
   const cached = cacheGet(symbol);
   if (cached) return cached;
 
+  // Coalesce concurrent chart and prediction requests for the same symbol.
   if (stockInflight.has(symbol)) {
     return stockInflight.get(symbol);
   }
@@ -514,6 +515,7 @@ router.get("/:symbol/predict", async (req, res) => {
       ? quotedPrice
       : history[history.length - 1].close;
 
+  // Keep prediction responses available even if the Python helper cannot run.
   function baselineForecast() {
     const returns = history.slice(1).map((point, index) =>
       Math.log(point.close / history[index].close)

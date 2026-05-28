@@ -6,6 +6,7 @@ const cryptoCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let lastRequestTime = 0;
 const THROTTLE_DELAY_MS = 1200;
+// CoinPaprika uses provider-specific IDs, so common CoinGecko IDs need mapping.
 const coinPaprikaIds = new Map([
   ["bitcoin", "btc-bitcoin"],
   ["ethereum", "eth-ethereum"],
@@ -35,6 +36,7 @@ function cachedFallback(key) {
   const cached = cryptoCache.get(key)?.data;
   if (!cached) return null;
 
+  // Serve stale provider data only after a prior successful response; never fabricate prices.
   return {
     ...cached,
     status: "stale",
@@ -62,6 +64,7 @@ async function coingeckoGet(path, params = {}) {
   });
 }
 
+// CoinPaprika is an attributed secondary source when CoinGecko is unavailable.
 function coinPaprikaId(value) {
   return coinPaprikaIds.get(value) || value;
 }
