@@ -7,7 +7,7 @@ and Gemini-assisted plain-English market explanations.
 This project is informational and educational only. It is not financial advice,
 and its historical next-session estimate is not an investment recommendation.
 
-- Application: [https://nextrade-jgp0.onrender.com/](https://nextrade-jgp0.onrender.com/)
+Live App: [https://nextrade-jgp0.onrender.com/](https://nextrade-jgp0.onrender.com/)
 
 ## Highlights
 
