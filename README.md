@@ -9,7 +9,7 @@ and its historical next-session estimate is not an investment recommendation.
 
 Live app: [https://nextrade-jgp0.onrender.com/](https://nextrade-jgp0.onrender.com/)
 
-## Silent Walkthrough
+## Walkthrough
 
 ![NexTrade silent walkthrough](docs/media/nextrade-walkthrough.gif)
 
