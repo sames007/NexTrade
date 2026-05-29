@@ -9,6 +9,14 @@ and its historical next-session estimate is not an investment recommendation.
 
 Live app: [https://nextrade-jgp0.onrender.com/](https://nextrade-jgp0.onrender.com/)
 
+## Screenshots
+
+| Dashboard | Stocks |
+| --- | --- |
+| ![NexTrade dashboard](docs/screenshots/dashboard.png) | ![NexTrade stock detail](docs/screenshots/stocks.png) |
+| Crypto | AI Assistant |
+| ![NexTrade crypto tracker](docs/screenshots/crypto.png) | ![NexTrade AI assistant](docs/screenshots/ai-assistant.png) |
+
 ## Highlights
 
 - Provider-sourced dashboard for stocks, crypto, news, market movers, and AI summaries.
